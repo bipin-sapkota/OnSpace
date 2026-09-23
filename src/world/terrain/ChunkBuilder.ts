@@ -195,7 +195,7 @@ export function buildChunk(gen: TerrainGen, req: ChunkRequest): ChunkResult {
   }
 
   // skirts
-  const skirtDepth = Math.max(2, cellWorld * 2.5);
+  const skirtDepth = Math.max(2, Math.min(cellWorld * 1.5, (maxH - minH) * 0.35 + 3));
   const perim = perimeterIndices();
   for (let k = 0; k < perim.length; k++) {
     const src = perim[k];

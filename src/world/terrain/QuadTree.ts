@@ -192,9 +192,14 @@ export class TerrainQuadTree {
     for (let j = 0; j < 2; j++) {
       for (let i = 0; i < 2; i++) {
         const c = new QuadNode(node.face, l, node.ix * 2 + i, node.iy * 2 + j, this.opts.radius, this.opts.heightScale);
-        // inherit a better height estimate from parent
-        c.minH = node.minH;
-        c.maxH = node.maxH;
+        // inherit a tighter bounds estimate from the parent until the child is built
+        if (node.ready) {
+          c.minH = node.minH;
+          c.maxH = node.maxH;
+          const mid = (node.minH + node.maxH) / 2;
+          c.center.normalize().multiplyScalar(this.opts.radius + mid);
+          c.boundRadius = c.size * 0.75 + (node.maxH - node.minH) * 0.5 + 2;
+        }
         node.children.push(c);
         this.request(c, this.priority(c));
       }
@@ -218,7 +223,8 @@ export class TerrainQuadTree {
 
   private updateNode(node: QuadNode, split: number): boolean {
     const dist = Math.max(0, node.center.distanceTo(this.camLocal) - node.boundRadius);
-    const wantSplit = node.level < this.maxLevel && dist < node.size * split;
+    // only refine nodes whose real bounds are known; keeps the tree tight
+    const wantSplit = node.level < this.maxLevel && dist < node.size * split && (node.ready || !!node.children);
     if (node.job) node.job.setPriority(this.priority(node));
     this.totalChunks++;
 
@@ -267,7 +273,7 @@ export class TerrainQuadTree {
     }
     this.visibleChunks = 0;
     this.totalChunks = 0;
-    const split = 2.1 * settings.data.terrainDetail;
+    const split = 1.75 * settings.data.terrainDetail;
     for (const r of this.roots) this.updateNode(r, split);
     this.opts.pool.pump();
   }

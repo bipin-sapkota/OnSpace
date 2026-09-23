@@ -12,6 +12,7 @@ import { RNG, hashString } from '../core/Random';
 export interface ScatterRecord {
   id: string;
   type: ScatterType;
+  variant: number;
   pos: THREE.Vector3; // planet local (base)
   up: THREE.Vector3;
   scale: number;
@@ -156,6 +157,7 @@ export class ScatterManager {
           g.records.push({
             id,
             type,
+            variant,
             pos: new THREE.Vector3(lx + center.x, ly + center.y, lz + center.z),
             up: up.clone(),
             scale: s,
