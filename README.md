@@ -113,3 +113,11 @@ src/
 - [three.js](https://threejs.org) — MIT licence.
 - Fonts [Orbitron](https://fonts.google.com/specimen/Orbitron) and [Rajdhani](https://fonts.google.com/specimen/Rajdhani), via Fontsource — SIL Open Font License 1.1.
 - Everything else (geometry, textures, shaders, audio, music, names, lore) is original and generated procedurally.
+
+---
+
+## Testing
+
+- `npm test` runs the unit tests in `tests/`. They cover deterministic generation, noise bounds, chunk building, inventory rules, and checks that every recipe and tech entry refers to items that exist.
+- `npm run typecheck` runs a strict TypeScript check.
+- `tools/play.mjs` plus `tools/scenarios/*.mjs` are scripted Playwright play-tests. They run against `vite preview` on port 4173 and cover starting a new game, flight, docking, menus, mining, wildlife, hyperspace jumps, save → reload, combat, weather, points of interest and asteroid mining. Screenshots are written to `screenshots/`. Example: `npm run build && npx vite preview --port 4173 & node tools/play.mjs tools/scenarios/flight.mjs`.

@@ -60,8 +60,8 @@ export class Multitool {
     camera.add(this.viewmodel);
     mesh.renderOrder = 50;
     // suit flashlight
-    this.flashlight = new THREE.SpotLight(0xfff1dc, 0, 70, 0.55, 0.45, 1.2);
-    this.flashlight.position.set(0.25, -0.1, 0);
+    this.flashlight = new THREE.SpotLight(0xfff1dc, 0, 60, 0.6, 0.5, 1.6);
+    this.flashlight.position.set(-0.35, 0.25, 0.1); // shoulder mount, clear of the viewmodel
     this.flashlight.target.position.set(0, 0, -10);
     camera.add(this.flashlight, this.flashlight.target);
   }
@@ -84,7 +84,7 @@ export class Multitool {
       this.flashlightOn = !this.flashlightOn;
       game.audio.play('ui_click', 0.5);
     }
-    this.flashlight.intensity = this.flashlightOn && game.mode === 'foot' ? 40 : 0;
+    this.flashlight.intensity = this.flashlightOn && game.mode === 'foot' ? 5 : 0;
     const active = game.mode === 'foot' && !game.cameraRig.thirdPersonFoot;
     this.viewmodel.visible = active;
     this.scanCooldown = Math.max(0, this.scanCooldown - dt);

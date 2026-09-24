@@ -390,10 +390,12 @@ export class PlayerShip {
       // auto drop-out near bodies
       const sys = game.world.system!;
       let drop = st.ship.pulseFuel <= 0;
+      const fwd = this.forward;
       for (const p of sys.planets) {
         const d = p.position.distanceTo(this.pos) - p.atmosphereRadius;
-        const ahead = this.forward.dot(p.position.clone().sub(this.pos).normalize()) > 0;
-        if (d < 3000 + (ahead ? this.pulseSpeed * 0.6 : 0)) drop = true;
+        // only bodies we are heading toward can interrupt the jump
+        const closing = fwd.dot(p.position.clone().sub(this.pos).normalize()) > 0.2;
+        if ((closing && d < 3000 + this.pulseSpeed * 0.6) || d < 300) drop = true;
       }
       for (const s of sys.stations) if (s.position.distanceTo(this.pos) < 2500 + this.pulseSpeed * 0.3 && this.forward.dot(s.position.clone().sub(this.pos)) > 0) drop = true;
       if (drop) this.exitPulse(game);

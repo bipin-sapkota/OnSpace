@@ -189,7 +189,7 @@ export class Planet {
     _m.copy(this.root.matrixWorld).invert();
     this.lu.uPlanetInvModel.value.copy(_m);
     this.lu.uTime.value = time;
-    this.lu.uNightAmbient.value = this.desc.atmosphere.enabled ? 0.2 : 0.35;
+    this.lu.uNightAmbient.value = this.desc.atmosphere.enabled ? 0.5 : 0.45;
 
     if (this.clouds) {
       this.clouds.mesh.visible = settings.data.clouds;

@@ -126,9 +126,11 @@ export class World {
     // ambient: sky light inside atmospheres, faint starlight in space
     const sky = planet.skyColor;
     const inA = this.env.inAtmosphere;
-    this.hemi.color.copy(sky).multiplyScalar(0.25 + 0.75 * this.env.day);
+    // day: sky-tinted skylight; night: cool, dim "moonlight" so terrain stays readable
+    const night = 1 - this.env.day;
+    this.hemi.color.copy(sky).multiplyScalar(0.25 + 0.75 * this.env.day).lerp(new THREE.Color(0.35, 0.45, 0.75), night * 0.6);
     this.hemi.groundColor.copy(planet.fogColor).multiplyScalar(0.35);
-    this.hemi.intensity = inA * (0.15 + 0.85 * this.env.day) * 0.9;
+    this.hemi.intensity = inA * (1.2 - 0.4 * this.env.day);
     // faint starlight keeps night sides and airless moons readable
     this.ambient.intensity = 0.22 + inA * 0.1 * this.env.day;
 

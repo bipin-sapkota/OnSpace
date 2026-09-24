@@ -78,7 +78,7 @@ export class ScatterManager {
       `,
       fragColor: /* glsl */ `
         #if defined( USE_COLOR ) || defined( USE_INSTANCING_COLOR )
-        totalEmissiveRadiance += max(vColor.rgb - vec3(1.0), vec3(0.0)) * 1.4;
+        totalEmissiveRadiance += max(vColor.rgb - vec3(1.0), vec3(0.0)) * 0.6;
         #endif
       `,
     });
