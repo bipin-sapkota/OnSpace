@@ -308,17 +308,17 @@ export class POIManager {
         if (lander) {
           prop('scifi/Prop_Chest', 1.6, 4, 0, 3, 0.4);
         } else {
-        const cls = allShipClasses()[rng.int(0, 3)];
-        const model = buildShipModel(cls, p.seed);
-        model.group.traverse((o) => {
-          const mm = o as THREE.Mesh;
-          if (mm.isMesh && mm.material instanceof THREE.MeshBasicMaterial) mm.visible = false;
-        });
-        model.gear.visible = false;
-        model.group.position.set(0, 0.6, 0);
-        model.group.rotation.set(rng.range(-0.25, 0.1), rng.range(0, 3), rng.range(0.2, 0.6));
-        model.group.scale.setScalar(1.15);
-        group.add(model.group);
+          const cls = allShipClasses()[rng.int(0, 3)];
+          const model = buildShipModel(cls, p.seed);
+          model.group.traverse((o) => {
+            const mm = o as THREE.Mesh;
+            if (mm.isMesh && mm.material instanceof THREE.MeshBasicMaterial) mm.visible = false;
+          });
+          model.gear.visible = false;
+          model.group.position.set(0, 0.6, 0);
+          model.group.rotation.set(rng.range(-0.25, 0.1), rng.range(0, 3), rng.range(0.2, 0.6));
+          model.group.scale.setScalar(1.15);
+          group.add(model.group);
         }
         for (let i = 0; i < 12; i++) {
           const a = rng.range(0, Math.PI * 2);
