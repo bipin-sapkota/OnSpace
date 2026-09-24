@@ -81,7 +81,7 @@ export class Game {
   private warpTunnel: WarpTunnel;
   mode: GameMode = 'menu';
   time = 0;
-  private clock = new THREE.Clock();
+  private lastFrame = performance.now();
   prompt: Prompt | null = null;
   lightning = 0;
   pendingPirates = 0;
@@ -530,7 +530,8 @@ export class Game {
     const charge = Math.min(1, w.t / 2.2);
     this.cameraRig.fovBoost = charge * 30;
     this.cameraRig.shake(0.08 * charge);
-    this.ship.vel.copy(this.ship.forward).multiplyScalar(300 + charge * 4000);
+    // accelerate into the jump; after the new system is streamed in the ship coasts in the tunnel
+    this.ship.vel.copy(this.ship.forward).multiplyScalar(w.loaded ? 0 : 300 + charge * 4000);
     this.ship.pos.addScaledVector(this.ship.vel, dt);
     this.ship.root.position.copy(this.ship.pos);
     this.ship.throttle = 1;
@@ -706,7 +707,9 @@ export class Game {
 
   private loop = (): void => {
     requestAnimationFrame(this.loop);
-    const rawDt = this.clock.getDelta();
+    const now = performance.now();
+    const rawDt = Math.max(0, (now - this.lastFrame) / 1000);
+    this.lastFrame = now;
     const dt = Math.min(rawDt, 1 / 20);
     this.fpsAcc += rawDt;
     this.fpsFrames++;
@@ -803,7 +806,8 @@ export class Game {
       this.lockedTarget = t;
       this.ship.lockedTarget = t ? { pos: t.pos, vel: t.vel ?? new THREE.Vector3() } : null;
     } else if (this.mode === 'foot') {
-      this.lockedTarget = this.combat.nearestHostile(this.player.eye, this.player.forward, 120, 0.96);
+      const t = this.combat.nearestHostile(this.player.eye, this.player.forward, 120, 0.96);
+      this.lockedTarget = t && (t.faction === 'hostile' || this.mining.mode === 'combat') ? t : null;
       this.ship.lockedTarget = null;
     } else {
       this.lockedTarget = null;
@@ -839,10 +843,17 @@ export class Game {
     this.effects.update(dt, this.cameraRig.posU, this.world.origin);
     this.effects.setPixelScale(this.renderer.renderer.domElement.height, this.renderer.camera.fov);
 
-    // music mood
+    // music mood (and slow environment checks)
     this.musicTimer -= dt;
     if (this.musicTimer <= 0) {
       this.musicTimer = 2;
+      const env = this.world.env;
+      if (env.planet && this.isPlaying && (env.inAtmosphere > 0.2 || env.altitude < env.planet.desc.terrain.heightScale * 4)) {
+        const pd = env.planet.desc;
+        if (this.discovery.discover(this, 'planet', env.planet.key, pd.name, `${pd.archetypeLabel} · ${this.world.system!.desc.name}`, pd.isMoon ? 400 : 600)) {
+          events.emit('planet:entered', { planetId: pd.id });
+        }
+      }
       const danger = this.combat.hostilesNear(focus, 400) || this.npcs.hostileCount > 0;
       const mood = danger ? 'danger' : this.mode === 'docked' ? 'station' : this.world.env.inAtmosphere > 0.3 ? (this.world.env.day < 0.3 ? 'night' : 'planet') : 'space';
       this.audio.setMood(mood);

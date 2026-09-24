@@ -47,6 +47,8 @@ export class Hud {
   private slowTimer = 0;
   private game: Game;
   private bannerTimer = 0;
+  /** Hidden while full-screen overlays (galaxy map) are shown. */
+  suppressed = false;
 
   constructor(parent: HTMLElement, game: Game) {
     this.game = game;
@@ -104,7 +106,7 @@ export class Hud {
 
   update(dt: number): void {
     const g = this.game;
-    const playing = g.isPlaying || g.mode === 'warp';
+    const playing = (g.isPlaying || g.mode === 'warp') && !this.suppressed;
     this.root.style.display = playing ? '' : 'none';
     if (!playing) return;
     const foot = g.mode === 'foot';

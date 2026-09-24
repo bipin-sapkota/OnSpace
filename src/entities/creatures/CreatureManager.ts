@@ -213,7 +213,8 @@ export class CreatureManager {
     const center = focusLocal.clone().addScaledVector(t1, Math.cos(ang) * dist).addScaledVector(t2, Math.sin(ang) * dist);
     const n = sp.herd[0] + Math.floor(Math.random() * (sp.herd[1] - sp.herd[0] + 1));
     let leader: Creature | null = null;
-    for (let i = 0; i < n; i++) {
+    const room = Math.max(0, 30 - this.creatures.length);
+    for (let i = 0; i < Math.min(n, room); i++) {
       const pos = center.clone().addScaledVector(t1, (Math.random() - 0.5) * 16).addScaledVector(t2, (Math.random() - 0.5) * 16);
       const dir = pos.clone().normalize();
       const r0 = p.surfaceRadius(dir);

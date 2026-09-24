@@ -34,6 +34,7 @@ test('galaxy and systems regenerate identically from a seed', () => {
   assert.equal(s1.planets[0].archetype, 'verdant');
   assert.equal(s1.planets.filter((p) => p.hasSignal).length, 1);
   assert.ok(s1.stations.length >= 1);
+  assert.ok(g1.neighbours(g1.startSystemId, 100).length >= 4, 'start system must have reachable neighbours');
 });
 
 test('different seeds produce different galaxies', () => {

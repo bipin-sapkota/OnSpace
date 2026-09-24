@@ -257,7 +257,7 @@ export class PlayerShip {
     this.model.gear.scale.setScalar(Math.max(0.01, this.gearDeploy));
     const glow = this.mode === 'landed' || this.mode === 'docked' ? 0 : 0.3 + this.throttle * 0.9 + (this.boosting ? 0.6 : 0) + (this.mode === 'pulse' ? 1.2 : 0);
     for (const m of this.model.engineGlow) {
-      m.scale.set(0.6 + glow * 0.5, 0.6 + glow * 0.5, 1 + glow * 3);
+      m.scale.set(0.35 + glow * 0.45, 0.35 + glow * 0.45, 0.6 + glow * 3);
       (m.material as THREE.MeshBasicMaterial).opacity = Math.min(1, glow);
       m.visible = glow > 0.02;
     }
@@ -398,6 +398,19 @@ export class PlayerShip {
       for (const s of sys.stations) if (s.position.distanceTo(this.pos) < 2500 + this.pulseSpeed * 0.3 && this.forward.dot(s.position.clone().sub(this.pos)) > 0) drop = true;
       if (drop) this.exitPulse(game);
     } else this.pulseSpeed = Math.max(0, this.pulseSpeed - dt * 20000);
+
+    // atmospheric entry: fast descent through the upper atmosphere heats the hull
+    if (inAtmo && planet.desc.atmosphere.enabled && alt.altitude > atmoH * 0.25) {
+      const descent = -this.vel.dot(alt.up);
+      const heat = THREE.MathUtils.clamp((this.speed - 180) / 400, 0, 1) * THREE.MathUtils.clamp(descent / 80, 0, 1);
+      if (heat > 0.05) {
+        game.cameraRig.shake(heat * 0.12);
+        const nose = this.pos.clone().addScaledVector(this.forward, this.model.length * 0.5);
+        const back = this.vel.clone().normalize().negate();
+        game.effects.spark(nose, back, new THREE.Color(3, 1.2, 0.4).multiplyScalar(0.5 + heat), Math.ceil(heat * 6), this.speed * 0.4, 1.2 * heat + 0.3, 0.35);
+        game.effects.glowAt(nose, new THREE.Color(2.5, 1.0, 0.3), this.model.length * 0.8 * heat, 0.08);
+      }
+    }
 
     const desired = this.forward.multiplyScalar(targetSpeed);
     const accel = pulsing ? 2.5 : this.boosting ? 1.6 : 1.2;

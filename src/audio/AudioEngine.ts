@@ -377,7 +377,7 @@ export class AudioEngine {
         if (oscs.length) {
           oscs.forEach((x, i) => x.frequency.setTargetAtTime(basePitch * pitch * (i === 1 ? 1.013 : i === 2 ? 2 : 1), t, 0.1));
         }
-        if (filt !== undefined) filter.frequency.setTargetAtTime(filt, t, 0.1);
+        if (filt !== undefined) filter.frequency.setTargetAtTime(Math.max(40, filt), t, 0.1);
       },
       stop: () => {
         if (stopped) return;

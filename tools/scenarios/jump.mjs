@@ -1,0 +1,36 @@
+import { lowSettings, startGame, sim } from './common.mjs';
+export default async (page, shot) => {
+  await lowSettings(page);
+  await startGame(page);
+  await sim(page, 25);
+  await page.waitForTimeout(2000);
+  await page.evaluate(() => { const g = window.game; const c = g.creatures.creatures.find(c => c.alive); if (!c) return; const p = g.player; const up = p.up; const d = new p.pos.constructor(1, 0.3, 0.2).normalize(); d.addScaledVector(up, -d.dot(up)).normalize(); p.placeAt(c.pos.clone().addScaledVector(d, 6 + c.species.size * 3), p.planet, d.clone().negate()); p.pitch = -0.15; });
+  await sim(page, 0.3);
+  await page.waitForTimeout(2500); await sim(page, 0.1);
+  await shot('j0_creature');
+  // equip and go to space
+  await page.evaluate(() => { const g = window.game; g.state.data.upgrades.ship_hyperdrive = 1; g.state.give('warp_cell', 2); g.boardShip(); const p = g.world.system.planets[0]; const up = g.ship.pos.clone().sub(p.position).normalize(); g.ship.landedPlanet = null; g.ship.pos.copy(p.position).addScaledVector(up, p.radius + 6000); g.ship.setMode('flying'); });
+  await sim(page, 0.5);
+  const target = await page.evaluate(() => { const g = window.game; const n = g.galaxy.neighbours(g.state.data.systemId, g.state.jumpRange); return n.length ? n[0].id : -1; });
+  console.log('target', target);
+  const ok = await page.evaluate((t) => window.game.jump(t), target);
+  console.log('jump', ok);
+  await sim(page, 2.4);
+  await shot('j1_warp');
+  await sim(page, 0.5);
+  await page.waitForTimeout(5000);
+  await sim(page, 6);
+  await page.waitForTimeout(5000); await sim(page, 0.2);
+  await shot('j2_arrive');
+  console.log(JSON.stringify(await page.evaluate(() => { const g = window.game; return { sys: g.world.system.desc.name, id: g.state.data.systemId, visited: g.state.data.visited, mode: g.mode, ship: g.ship.mode, quest: g.quest.title(g) }; })));
+  const saved = await page.evaluate(() => window.game.save('slot2'));
+  console.log('saved', saved);
+  await page.reload();
+  await page.waitForSelector('[data-m="continue"]');
+  await page.waitForTimeout(1000);
+  await page.click('[data-m="continue"]');
+  await page.waitForFunction(() => window.game && window.game.isPlaying && !document.getElementById('loading'), null, { timeout: 300000 });
+  await sim(page, 0.3);
+  await shot('j3_loaded');
+  console.log(JSON.stringify(await page.evaluate(() => { const g = window.game; return { sys: g.world.system.desc.name, mode: g.mode, ship: g.ship.mode, cells: g.state.count('warp_cell'), hyper: g.state.level('ship_hyperdrive') }; })));
+};

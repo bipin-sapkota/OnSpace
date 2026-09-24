@@ -4,7 +4,7 @@ export async function lowSettings(page) {
   });
 }
 export async function startGame(page, seed = '4242') {
-  await page.goto('http://localhost:5173/');
+  await page.goto(process.env.GAME_URL || 'http://localhost:4173/');
   await page.waitForSelector('[data-m="new"]');
   await page.waitForTimeout(1000);
   await page.click('[data-m="new"]');

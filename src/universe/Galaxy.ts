@@ -12,10 +12,10 @@ export class Galaxy {
   readonly seed: number;
   readonly systems: GalaxySystemEntry[] = [];
   readonly startSystemId: number;
-  readonly radius = 900;
+  readonly radius = 600;
   private cache = new Map<number, StarSystemDesc>();
 
-  constructor(seed: number, count = 520) {
+  constructor(seed: number, count = 700) {
     this.seed = seed;
     const rng = new RNG(seed);
     const arms = 3;
@@ -47,6 +47,7 @@ export class Galaxy {
     let best = 0;
     let bestScore = -Infinity;
     for (const s of this.systems) {
+      if (this.neighbours(s.id, 100).length < 4) continue;
       const d = Math.hypot(s.pos[0], s.pos[2]);
       const calm = s.starClass === 'G' || s.starClass === 'K' ? 60 : 0;
       const score = d + calm - s.conflict * 80;
@@ -56,6 +57,11 @@ export class Galaxy {
       }
     }
     this.startSystemId = best;
+  }
+
+  private distSq(a: number, b: number): number {
+    const pa = this.systems[a].pos, pb = this.systems[b].pos;
+    return (pa[0] - pb[0]) ** 2 + (pa[1] - pb[1]) ** 2 + (pa[2] - pb[2]) ** 2;
   }
 
   getSystem(id: number): StarSystemDesc {
@@ -75,8 +81,9 @@ export class Galaxy {
 
   /** Systems reachable from `from` within `range` light years, sorted by distance. */
   neighbours(from: number, range: number): GalaxySystemEntry[] {
+    const r2 = range * range;
     return this.systems
-      .filter((s) => s.id !== from && this.distance(from, s.id) <= range)
+      .filter((s) => s.id !== from && this.distSq(from, s.id) <= r2)
       .sort((a, b) => this.distance(from, a.id) - this.distance(from, b.id));
   }
 

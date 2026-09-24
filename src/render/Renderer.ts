@@ -123,7 +123,7 @@ export class Renderer {
     this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.shadowMap.enabled = settings.data.shadows;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.info.autoReset = false;
     container.appendChild(this.renderer.domElement);
     this.renderer.domElement.id = 'game-canvas';

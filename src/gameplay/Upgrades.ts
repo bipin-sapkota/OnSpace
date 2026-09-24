@@ -139,5 +139,5 @@ registerTech({
 });
 
 export function hyperRange(level: number): number {
-  return level <= 0 ? 0 : [0, 70, 120, 190, 300][Math.min(4, level)];
+  return level <= 0 ? 0 : [0, 100, 160, 250, 400][Math.min(4, level)];
 }

@@ -98,6 +98,7 @@ export class GalaxyScreen extends Screen {
   }
 
   override onOpen(): void {
+    this.ui.hud.suppressed = true;
     this.game.renderer.overlayScene = this.scene;
     this.game.renderer.overlayCamera = this.camera;
     this.el.addEventListener('mousedown', this.down);
@@ -107,6 +108,7 @@ export class GalaxyScreen extends Screen {
   }
 
   override onClose(): void {
+    this.ui.hud.suppressed = false;
     this.game.renderer.overlayScene = null;
     this.game.renderer.overlayCamera = null;
     window.removeEventListener('mousemove', this.move);
