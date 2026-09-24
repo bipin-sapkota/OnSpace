@@ -32,6 +32,8 @@ export class Multitool {
   scanCooldown = 0;
   private beamLoop: LoopHandle | null = null;
   private lastYieldTime = 0;
+  readonly flashlight: THREE.SpotLight;
+  flashlightOn = false;
   /** Scanner-highlighted resources: record + expiry time. */
   readonly highlights: { rec: ScatterRecord; until: number }[] = [];
 
@@ -57,6 +59,11 @@ export class Multitool {
     this.viewmodel.visible = false;
     camera.add(this.viewmodel);
     mesh.renderOrder = 50;
+    // suit flashlight
+    this.flashlight = new THREE.SpotLight(0xfff1dc, 0, 70, 0.55, 0.45, 1.2);
+    this.flashlight.position.set(0.25, -0.1, 0);
+    this.flashlight.target.position.set(0, 0, -10);
+    camera.add(this.flashlight, this.flashlight.target);
   }
 
   /** World-space muzzle position. */
@@ -73,6 +80,11 @@ export class Multitool {
   }
 
   update(dt: number, game: Game): void {
+    if (game.mode === 'foot' && !game.uiBlocking && game.input.wasPressed('flashlight')) {
+      this.flashlightOn = !this.flashlightOn;
+      game.audio.play('ui_click', 0.5);
+    }
+    this.flashlight.intensity = this.flashlightOn && game.mode === 'foot' ? 40 : 0;
     const active = game.mode === 'foot' && !game.cameraRig.thirdPersonFoot;
     this.viewmodel.visible = active;
     this.scanCooldown = Math.max(0, this.scanCooldown - dt);

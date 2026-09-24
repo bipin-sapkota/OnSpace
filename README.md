@@ -56,6 +56,7 @@ It needs a browser with WebGL 2 (current Chrome, Edge, Firefox or Safari) and a 
 | **G** | Galaxy map | Galaxy map |
 | **Tab / I** | Exosuit (inventory, crafting, tech) | same |
 | **M / J / K / B** | Map / Log / Discoveries / Crafting | same |
+| **L** | Flashlight | – |
 | **V / H / F5 / Esc** | Third person / HUD / Quick save / Menu | same |
 
 ---

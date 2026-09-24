@@ -26,7 +26,7 @@ export class Quest {
       {
         title: 'Find your ship',
         text: () => 'Your ship crash-landed nearby. Follow the marker and reach it.',
-        check: (g) => g.player.pos.distanceTo(g.ship.pos) < 18,
+        check: (g) => g.player.pos.distanceTo(g.ship.pos) < 18 || g.mode === 'ship',
         waypoint: (g) => ({ pos: g.ship.pos.clone(), label: 'Your Ship' }),
       },
       {

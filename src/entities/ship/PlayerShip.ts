@@ -255,7 +255,7 @@ export class PlayerShip {
     this.root.quaternion.copy(this.quat);
     this.model.gear.visible = this.gearDeploy > 0.02;
     this.model.gear.scale.setScalar(Math.max(0.01, this.gearDeploy));
-    const glow = this.mode === 'landed' || this.mode === 'docked' ? 0 : 0.3 + this.throttle * 0.9 + (this.boosting ? 0.6 : 0) + (this.mode === 'pulse' ? 1.2 : 0);
+    const glow = this.mode === 'landed' || this.mode === 'docked' ? 0 : 0.12 + Math.max(0, this.throttle) * 0.9 + (this.boosting ? 0.6 : 0) + (this.mode === 'pulse' ? 1.2 : 0);
     for (const m of this.model.engineGlow) {
       m.scale.set(0.35 + glow * 0.45, 0.35 + glow * 0.45, 0.6 + glow * 3);
       (m.material as THREE.MeshBasicMaterial).opacity = Math.min(1, glow);

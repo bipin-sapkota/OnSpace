@@ -129,7 +129,8 @@ export class World {
     this.hemi.color.copy(sky).multiplyScalar(0.25 + 0.75 * this.env.day);
     this.hemi.groundColor.copy(planet.fogColor).multiplyScalar(0.35);
     this.hemi.intensity = inA * (0.15 + 0.85 * this.env.day) * 0.9;
-    this.ambient.intensity = 0.12 + inA * 0.1 * this.env.day;
+    // faint starlight keeps night sides and airless moons readable
+    this.ambient.intensity = 0.22 + inA * 0.1 * this.env.day;
 
     // backdrop brightness fades in daylight skies
     const skyBright = 1 - inA * this.env.day * 0.97;

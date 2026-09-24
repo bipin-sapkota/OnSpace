@@ -35,7 +35,7 @@ export class ControlsScreen extends Screen {
       ['W A S D', 'Move / Throttle & roll (ship)'], ['Mouse', 'Look / Steer'], ['Space', 'Jump · Jetpack (hold) · Launch'], ['Shift', 'Sprint · Boost'],
       ['LMB', 'Mine / Fire'], ['Q', 'Switch mining beam / boltcaster'], ['C', 'Scanner pulse'], ['F (hold)', 'Analysis visor'],
       ['E', 'Interact · Board / exit ship · Land · Dock'], ['R', 'Pulse drive (space)'], ['G', 'Galaxy map'], ['Tab / I', 'Exosuit: inventory, crafting, technology'],
-      ['B', 'Crafting'], ['M', 'Map'], ['J', 'Mission log'], ['K', 'Discoveries'], ['V', 'Toggle third person (on foot)'], ['H', 'Toggle HUD'], ['F5', 'Quick save'], ['Esc', 'Pause / close menus'],
+      ['B', 'Crafting'], ['M', 'Map'], ['J', 'Mission log'], ['K', 'Discoveries'], ['V', 'Toggle third person (on foot)'], ['L', 'Flashlight'], ['H', 'Toggle HUD'], ['F5', 'Quick save'], ['Esc', 'Pause / close menus'],
     ];
     this.el.innerHTML = `<div class="window narrow"><div class="titlebar"><h2>CONTROLS</h2><button class="close-x small" data-action="back">Back</button></div>
       <div class="body"><div class="keys-table">${rows.map(([k, v]) => `<div><kbd>${esc(k)}</kbd></div><div class="dim">${esc(v)}</div>`).join('')}</div></div></div>`;

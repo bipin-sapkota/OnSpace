@@ -220,7 +220,7 @@ export class Hud {
       const mt = g.mining;
       const heatCol = mt.overheated ? '#ff5c5c' : mt.heat > 0.7 ? '#ffb54a' : '#5fe3ff';
       this.toolhud.innerHTML = `<div class="mode">${mt.mode === 'mine' ? '⛏ MINING BEAM' : '✦ BOLTCASTER'}</div>${this.barRow('♨', 1 - mt.heat, heatCol, mt.overheated ? 'HOT' : `${Math.round((1 - mt.heat) * 100)}%`)}
-        <div class="keys"><kbd>LMB</kbd>use <kbd>Q</kbd>switch <kbd>C</kbd>scan${mt.scanCooldown > 0 ? ` (${mt.scanCooldown.toFixed(0)}s)` : ''} <kbd>F</kbd>analyse<br><kbd>TAB</kbd>exosuit <kbd>M</kbd>map <kbd>J</kbd>log <kbd>SPACE</kbd>jetpack</div>`;
+        <div class="keys"><kbd>LMB</kbd>use <kbd>Q</kbd>switch <kbd>C</kbd>scan${mt.scanCooldown > 0 ? ` (${mt.scanCooldown.toFixed(0)}s)` : ''} <kbd>F</kbd>analyse<br><kbd>TAB</kbd>exosuit <kbd>M</kbd>map <kbd>J</kbd>log <kbd>L</kbd>light${g.world.env.day < 0.3 && !mt.flashlightOn ? ' <span class="warn">(dark)</span>' : ''}</div>`;
     }
     if (ship || g.mode === 'docked') {
       const s = g.ship;
@@ -296,6 +296,12 @@ export class Hud {
     const t = g.lockedTarget;
     if (t && t.alive) {
       list.push({ key: 'target', pos: t.pos, glyph: '', name: t.label ?? '', color: '#ff5c5c', cls: 'target', showDist: true, hp: t.hpFrac ?? 1 });
+      if (g.mode === 'ship' && t.vel) {
+        // where to aim so photon bolts intercept the target
+        const rel = t.vel.clone().sub(g.ship.vel);
+        const tt = t.pos.distanceTo(g.ship.pos) / 2400;
+        list.push({ key: 'lead', pos: t.pos.clone().addScaledVector(rel, tt), glyph: '', name: '', color: '#ffb54a', cls: 'lead' });
+      }
     }
     return list;
   }
@@ -318,7 +324,7 @@ export class Hud {
       let y = (-v.y * 0.5 + 0.5) * h;
       let edge = false;
       if (behind || x < 30 || x > w - 30 || y < 60 || y > h - 30) {
-        if (m.cls === 'res' || m.cls === 'target') continue;
+        if (m.cls === 'res' || m.cls === 'target' || m.cls === 'lead') continue;
         edge = true;
         let dx = x - w / 2;
         let dy = y - h / 2;
