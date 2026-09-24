@@ -4,12 +4,6 @@ async function visit(page, shot, type, name) {
     const g = window.game; const planet = g.world.system.planets[0];
     const poi = g.pois.generate(planet, g).find(p => p.type === type);
     if (!poi) return null;
-    // advance the clock until the site is in daylight
-    for (let k = 0; k < 96; k++) {
-      planet.update(g.time, 0, g.cameraRig.posU, g.renderer.camera, g.world.origin, g.world.system.star.color);
-      if (planet.sunElevation(planet.toUniverse(poi.local)) > 0.45) break;
-      g.time += planet.desc.dayLength / 48;
-    }
     const up = poi.dir.clone(); const side = new up.constructor(0.3, 1, 0.2).cross(up).normalize();
     const u = planet.toUniverse(poi.local.clone().addScaledVector(side, 28));
     g.player.placeAt(u, planet, planet.toUniverse(poi.local).sub(u)); g.player.pitch = -0.05;
