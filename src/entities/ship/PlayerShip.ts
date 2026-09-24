@@ -256,9 +256,11 @@ export class PlayerShip {
     this.model.gear.visible = this.gearDeploy > 0.02;
     this.model.gear.scale.setScalar(Math.max(0.01, this.gearDeploy));
     const glow = this.mode === 'landed' || this.mode === 'docked' ? 0 : 0.12 + Math.max(0, this.throttle) * 0.9 + (this.boosting ? 0.6 : 0) + (this.mode === 'pulse' ? 1.2 : 0);
+    const flicker = 0.92 + Math.random() * 0.16;
     for (const m of this.model.engineGlow) {
-      m.scale.set(0.35 + glow * 0.45, 0.35 + glow * 0.45, 0.6 + glow * 3);
-      (m.material as THREE.MeshBasicMaterial).opacity = Math.min(1, glow);
+      const w = (0.45 + glow * 0.4) * flicker;
+      m.scale.set(w, w, (0.5 + glow * 3.2) * flicker);
+      (m.material as THREE.MeshBasicMaterial).opacity = Math.min(1, glow * 1.2);
       m.visible = glow > 0.02;
     }
     this.updateSound(game, piloting);

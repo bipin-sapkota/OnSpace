@@ -136,7 +136,7 @@ export class World {
 
     // backdrop brightness fades in daylight skies
     const skyBright = 1 - inA * this.env.day * 0.97;
-    sys.skybox.update(cam.position, skyBright, Math.max(1, this.renderer.renderer.domElement.height / 900));
+    sys.skybox.update(cam.position, skyBright, Math.max(0.5, this.renderer.pixelHeight / 900));
     this.renderer.atmosphere.instances = sys.atmospheres;
   }
 

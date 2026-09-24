@@ -124,10 +124,23 @@ export function buildShipModel(cls: ShipClass, seed: number): ShipModel {
       b.add(box(0.3, 2, 2.5), second, trs(0, 1.8, 4.5, -0.3, 0, 0));
     }
   }
-  // greebles
+  // hull detailing: panel seams, livery stripes, vents, antennae
+  const seam = main.clone().multiplyScalar(0.72);
+  for (let i = 0; i < 5; i++) {
+    const z = -4 + i * 2.2;
+    b.add(box(length > 18 ? 6.2 : 3.35, 0.06, 0.08), seam, trs(0, length > 18 ? 2.8 : 1.12, z));
+  }
+  b.add(box(0.45, 0.05, length * 0.55), second.clone().multiplyScalar(1.05), trs(0.7, length > 18 ? 2.8 : 1.13, 0));
+  b.add(box(0.45, 0.05, length * 0.55), second.clone().multiplyScalar(1.05), trs(-0.7, length > 18 ? 2.8 : 1.13, 0));
+  for (let i = 0; i < 3; i++) {
+    b.add(box(0.12, 0.25, 0.9), dark, trs(1.62, 0.2, -1 + i * 1.2));
+    b.add(box(0.12, 0.25, 0.9), dark, trs(-1.62, 0.2, -1 + i * 1.2));
+  }
   for (let i = 0; i < 8; i++) {
     b.add(box(rng.range(0.3, 0.9), rng.range(0.15, 0.4), rng.range(0.3, 1.2)), dark, trs(rng.range(-1.2, 1.2), rng.range(0.6, 1.3), rng.range(-3, 4)));
   }
+  b.add(column(0.03, 0.05, 4), dark, trs(0.5, 1.1, 2.5, -0.4, 0, 0, 1, 1.6, 1));
+  b.add(ico(0.06, 0), new THREE.Color(1, 0.8, 0.3), trs(0.5, 2.55, 3.1), 4);
   // navigation lights
   b.add(ico(0.12, 0), new THREE.Color(1, 0.15, 0.1), trs(-3.5, 0, 1.5), 5);
   b.add(ico(0.12, 0), new THREE.Color(0.2, 1, 0.3), trs(3.5, 0, 1.5), 5);
@@ -138,14 +151,19 @@ export function buildShipModel(cls: ShipClass, seed: number): ShipModel {
   hull.receiveShadow = true;
   group.add(hull);
 
+  // engine exhaust: bright core + tapered plume, both additive; scaled with throttle
   const engineGlow: THREE.Mesh[] = [];
-  const glowGeo = new THREE.SphereGeometry(0.7, 12, 8);
+  const plumeGeo = new THREE.ConeGeometry(0.62, 1, 14, 1, true);
+  plumeGeo.rotateX(Math.PI / 2); // wide end at the nozzle, tip trailing behind (+Z)
+  plumeGeo.translate(0, 0, 0.5);
+  const coreGeo = new THREE.SphereGeometry(0.42, 12, 8);
   for (const n of nozzles) {
-    const m = new THREE.Mesh(glowGeo, new THREE.MeshBasicMaterial({ color: engineCol.clone().multiplyScalar(4), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
-    m.position.copy(n);
-    m.scale.set(1, 1, 2.2);
-    group.add(m);
-    engineGlow.push(m);
+    const holder = new THREE.Mesh(coreGeo, new THREE.MeshBasicMaterial({ color: engineCol.clone().lerp(new THREE.Color(1, 1, 1), 0.4).multiplyScalar(2.2), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+    holder.position.copy(n);
+    const plume = new THREE.Mesh(plumeGeo, new THREE.MeshBasicMaterial({ color: engineCol.clone().multiplyScalar(1.4), transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    holder.add(plume);
+    group.add(holder);
+    engineGlow.push(holder);
   }
 
   const gear = new THREE.Group();

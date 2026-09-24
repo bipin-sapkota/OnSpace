@@ -190,7 +190,7 @@ export class NpcShips {
       s.pos.addScaledVector(s.vel, dt);
       s.root.position.copy(s.pos);
       s.root.quaternion.copy(s.quat);
-      for (const m of s.model.engineGlow) m.scale.set(0.9, 0.9, 2.5);
+      for (const m of s.model.engineGlow) m.scale.set(0.8, 0.8, 2.6);
       s.shield = Math.min(s.role === 'pirate' ? 60 : 40, s.shield + dt * 3);
     }
   }

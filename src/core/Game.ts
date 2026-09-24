@@ -717,6 +717,7 @@ export class Game {
       this.fps = this.fpsFrames / this.fpsAcc;
       this.fpsAcc = 0;
       this.fpsFrames = 0;
+      this.adaptResolution();
     }
     try {
       this.frame(dt);
@@ -725,6 +726,32 @@ export class Game {
     }
     this.input.endFrame();
   };
+
+  /** Dynamic resolution: trade pixels for frame rate when the GPU struggles. */
+  private lowFpsTime = 0;
+  private highFpsTime = 0;
+  private adaptResolution(): void {
+    if (!this.isPlaying) return;
+    const r = this.renderer;
+    if (this.fps < 38) {
+      this.lowFpsTime += 0.5;
+      this.highFpsTime = 0;
+    } else if (this.fps > 57) {
+      this.highFpsTime += 0.5;
+      this.lowFpsTime = 0;
+    } else {
+      this.lowFpsTime = this.highFpsTime = 0;
+    }
+    if (this.lowFpsTime >= 2 && r.dynamicScale > 0.6) {
+      r.dynamicScale = Math.max(0.6, r.dynamicScale - 0.1);
+      r.resize();
+      this.lowFpsTime = 0;
+    } else if (this.highFpsTime >= 4 && r.dynamicScale < 1) {
+      r.dynamicScale = Math.min(1, r.dynamicScale + 0.1);
+      r.resize();
+      this.highFpsTime = 0;
+    }
+  }
 
   private frame(dt: number): void {
     const fm = this.renderer.finalMat.uniforms;
@@ -841,7 +868,7 @@ export class Game {
     this.world.update(this.time, dt, this.cameraRig.posU, focus);
     this.weather.update(dt, this);
     this.effects.update(dt, this.cameraRig.posU, this.world.origin);
-    this.effects.setPixelScale(this.renderer.renderer.domElement.height, this.renderer.camera.fov);
+    this.effects.setPixelScale(this.renderer.pixelHeight, this.renderer.camera.fov);
 
     // music mood (and slow environment checks)
     this.musicTimer -= dt;

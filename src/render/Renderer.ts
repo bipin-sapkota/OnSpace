@@ -108,6 +108,8 @@ export class Renderer {
   private fxaaMat: THREE.ShaderMaterial;
   private width = 1;
   private height = 1;
+  /** Automatic resolution multiplier managed by the game to hold frame rate. */
+  dynamicScale = 1;
   /** Extra scene rendered on top without post (e.g. galaxy map). */
   overlayScene: THREE.Scene | null = null;
   overlayCamera: THREE.Camera | null = null;
@@ -192,7 +194,7 @@ export class Renderer {
   resize(): void {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const scale = settings.data.renderScale * Math.min(window.devicePixelRatio || 1, 1.5);
+    const scale = settings.data.renderScale * this.dynamicScale * Math.min(window.devicePixelRatio || 1, 1.5);
     this.width = Math.max(1, Math.floor(w * scale));
     this.height = Math.max(1, Math.floor(h * scale));
     this.renderer.setSize(w, h, false);
@@ -206,6 +208,11 @@ export class Renderer {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.fxaaMat.uniforms.uInv.value.set(1 / this.width, 1 / this.height);
+  }
+
+  /** Height in pixels of the internal HDR render target (point sprites are sized against this). */
+  get pixelHeight(): number {
+    return this.height;
   }
 
   get drawCalls(): number {

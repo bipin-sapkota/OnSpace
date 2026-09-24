@@ -15,6 +15,7 @@ export class CameraRig {
   private fromPos = new THREE.Vector3();
   private fromQuat = new THREE.Quaternion();
   private chasePos = new THREE.Vector3();
+  private chaseRel = new THREE.Vector3();
   private chaseInit = false;
   private chaseUp = new THREE.Vector3(0, 1, 0);
   fovBoost = 0;
@@ -65,16 +66,16 @@ export class CameraRig {
       } else {
         desired = s.pos.clone().addScaledVector(fwd, -L * 1.25).addScaledVector(up, L * 0.32);
       }
+      const relDesired = desired.clone().sub(s.pos);
       if (!this.chaseInit) {
-        this.chasePos.copy(desired);
+        this.chaseRel.copy(relDesired);
         this.chaseUp.copy(up);
         this.chaseInit = true;
       }
-      // follow in ship-relative frame so high speed does not lag the camera far behind
-      const rel = this.chasePos.clone().sub(s.pos);
-      const relDesired = desired.clone().sub(s.pos);
-      rel.lerp(relDesired, 1 - Math.exp(-dt * 7));
-      this.chasePos.copy(s.pos).add(rel);
+      // smooth the offset relative to the ship (not its world position) so the
+      // camera lags only in rotation, never in distance, at any speed
+      this.chaseRel.lerp(relDesired, 1 - Math.exp(-dt * 7));
+      this.chasePos.copy(s.pos).add(this.chaseRel);
       this.chaseUp.lerp(up, 1 - Math.exp(-dt * 5)).normalize();
       target.copy(this.chasePos);
       const lookAt = s.pos.clone().addScaledVector(fwd, docked ? 0 : L * 2.2).addScaledVector(up, docked ? 0 : L * 0.1);

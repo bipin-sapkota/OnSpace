@@ -129,7 +129,7 @@ export class UI {
       return true;
     }
     if (top instanceof PauseScreen) {
-      this.closeAll(true);
+      if (performance.now() - this.pauseOpenedAt > 250) this.closeAll(true);
       return true;
     }
     if (!top.closable) return true;
@@ -138,13 +138,19 @@ export class UI {
     return true;
   }
 
+  private pauseOpenedAt = 0;
+
   togglePause(): void {
-    if (this.stack.some((s) => s instanceof PauseScreen)) this.closeAll(true);
-    else this.openPause();
+    if (this.stack.some((s) => s instanceof PauseScreen)) {
+      // Esc both releases pointer lock (which opens pause) and may arrive as a key press
+      if (performance.now() - this.pauseOpenedAt < 250) return;
+      this.closeAll(true);
+    } else this.openPause();
   }
 
   openPause(): void {
     if (!this.game.isPlaying || this.stack.some((s) => s instanceof PauseScreen)) return;
+    this.pauseOpenedAt = performance.now();
     this.push(new PauseScreen(this, this.game));
   }
 
