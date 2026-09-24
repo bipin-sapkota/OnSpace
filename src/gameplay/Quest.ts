@@ -165,9 +165,9 @@ export class Quest {
         if (game.state.learnBlueprint('hyperdrive')) learned.push('Hyperdrive');
         if (game.state.learnBlueprint('warp_cell')) learned.push('Warp Cell');
         if (game.state.learnBlueprint('circuit')) learned.push('Circuit Lattice');
-        game.state.give('nullite', 20);
+        game.state.give('nullite', 30);
         game.state.give('tech_fragment', 3);
-        reward = learned.length ? `Blueprints learned: ${learned.join(', ')}. Received 20 Nullite and 3 Tech Fragments.` : 'Received 20 Nullite and 3 Tech Fragments. The Signal points further coreward.';
+        reward = learned.length ? `Blueprints learned: ${learned.join(', ')}. Received 30 Nullite and 3 Tech Fragments.` : 'Received 30 Nullite and 3 Tech Fragments. The Signal points further coreward.';
         if (q.step === 4) this.advance(game);
         const attuned = flags.attuned;
         if (attuned >= 5 && !flags.finale) {
