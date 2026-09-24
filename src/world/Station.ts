@@ -3,6 +3,8 @@ import { RNG } from '../core/Random';
 import { GeoBuilder, box, column, trs, sphere, ico } from '../render/GeoKit';
 import { propMaterial } from '../render/Materials';
 import type { StationDesc } from '../universe/types';
+import { assets } from '../assets/AssetLibrary';
+import { disposeOwnedGeometry } from '../assets/PropFactory';
 
 /**
  * Orbital trading station. Procedurally assembled: armoured core, rotating
@@ -74,6 +76,7 @@ export class Station {
       const len = rng.range(60, 140);
       core.add(column(1.5, 3, 5), dark, trs(Math.cos(a) * 40, 60, Math.sin(a) * 40, Math.cos(a) * 0.5, 0, Math.sin(a) * 0.5, 1, len, 1));
     }
+    this.furnishHangar(rng);
     const coreMesh = new THREE.Mesh(core.build(), this.mat);
     coreMesh.castShadow = true;
     coreMesh.receiveShadow = true;
@@ -112,6 +115,28 @@ export class Station {
     this.root.updateMatrixWorld();
   }
 
+  /** Hangar dressing from imported models: cargo, service vehicles, crew, a museum-piece lander. */
+  private furnishHangar(rng: RNG): void {
+    const floor = -18;
+    const place = (key: string, size: number, x: number, z: number, yaw: number, axis: 'y' | 'max' = 'max') => {
+      const o = assets.prop(key, size, axis);
+      if (!o) return;
+      o.position.set(x, floor, z);
+      o.rotation.y = yaw;
+      this.root.add(o);
+    };
+    place('nasa/lunar_module', 16, -58, 200, rng.range(0, 6));
+    for (let i = 0; i < 4; i++) place(i % 2 ? 'spacebase/cargo_A_stacked' : 'spacebase/cargo_B_stacked', 6, 62 + (i % 2) * 7, 95 + Math.floor(i / 2) * 8, rng.range(-0.2, 0.2));
+    place('spacebase/cargodepot_C', 16, 60, 215, -Math.PI / 2);
+    place('spacebase/spacetruck_large', 7, 38, 175, rng.range(0, 6));
+    place('spacebase/spacetruck', 5.5, -40, 95, rng.range(0, 6));
+    place('nasa/sev_rover', 7, -62, 128, Math.PI / 2);
+    place('scifi/Prop_Computer', 2.2, -26, 100, Math.PI / 4, 'y');
+    place('nasa/astronaut', 1.85, -24, 104, Math.PI * 0.8, 'y');
+    place('nasa/astronaut', 1.85, 30, 150, -Math.PI / 2, 'y');
+    place('nasa/eva_suit', 1.9, 34, 92, -0.4, 'y');
+  }
+
   update(time: number): void {
     this.ring.rotation.y = time * 0.05;
     this.beacons.visible = Math.floor(time * 1.2) % 2 === 0;
@@ -127,7 +152,7 @@ export class Station {
   }
 
   dispose(): void {
-    this.root.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+    disposeOwnedGeometry(this.root);
     this.mat.dispose();
     this.root.removeFromParent();
   }

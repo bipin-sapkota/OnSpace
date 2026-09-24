@@ -65,7 +65,7 @@ export class Planet {
     this.skyColor.setRGB(r[0], r[1], r[2]).multiplyScalar(1 / Math.max(r[0], r[1], r[2])).lerp(this.fogColor, 0.3);
 
     pool.register(this.key, desc.terrain);
-    this.terrainMat = createTerrainMaterial(this.lu);
+    this.terrainMat = createTerrainMaterial(this.lu, desc.archetype);
     if (this.gen.hasSea) this.liquidMat = createLiquidMaterial(this.lu, desc.terrain, this.skyColor);
 
     this.scatter = new ScatterManager(desc.terrain, desc.archetype, this.lu, this.root, depleted);

@@ -4,6 +4,12 @@ async function visit(page, shot, type, name) {
     const g = window.game; const planet = g.world.system.planets[0];
     const poi = g.pois.generate(planet, g).find(p => p.type === type);
     if (!poi) return null;
+    // advance the clock until the site is in daylight
+    for (let k = 0; k < 96; k++) {
+      planet.update(g.time, 0, g.cameraRig.posU, g.renderer.camera, g.world.origin, g.world.system.star.color);
+      if (planet.sunElevation(planet.toUniverse(poi.local)) > 0.45) break;
+      g.time += planet.desc.dayLength / 48;
+    }
     const up = poi.dir.clone(); const side = new up.constructor(0.3, 1, 0.2).cross(up).normalize();
     const u = planet.toUniverse(poi.local.clone().addScaledVector(side, 28));
     g.player.placeAt(u, planet, planet.toUniverse(poi.local).sub(u)); g.player.pitch = -0.05;
@@ -19,6 +25,8 @@ export default async (page, shot) => {
   await visit(page, shot, 'crash', 'p1_crash');
   await visit(page, shot, 'outpost', 'p2_outpost');
   await visit(page, shot, 'ruins', 'p3_ruins');
+  await visit(page, shot, 'beacon', 'p3_beacon');
+  await visit(page, shot, 'deposit', 'p3_deposit');
   // asteroid field near the station
   await page.evaluate(() => { const g = window.game; Object.defineProperty(g.input, 'locked', { get: () => true, configurable: true }); g.boardShip(); const b = g.world.system.desc.belts[1]; g.ship.landedPlanet = null; g.ship.pos.set(b.center[0], b.center[1], b.center[2]); g.ship.setMode('flying'); g.ship.throttle = 0; });
   await sim(page, 0.5);

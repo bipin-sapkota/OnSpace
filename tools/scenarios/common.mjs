@@ -1,7 +1,7 @@
 export async function lowSettings(page) {
-  await page.addInitScript(() => {
-    localStorage.setItem('onspace.settings.v1', JSON.stringify({ quality: 'low', renderScale: 0.45, shadows: true, atmosphereSteps: 6, bloom: true, antialias: false, vegetationDensity: 0.8, terrainDetail: 1, showFps: true }));
-  });
+  await page.addInitScript((rs) => {
+    localStorage.setItem('onspace.settings.v1', JSON.stringify({ quality: 'low', renderScale: rs, shadows: true, atmosphereSteps: 6, bloom: true, antialias: false, vegetationDensity: 0.8, terrainDetail: 1, showFps: true }));
+  }, Number(process.env.RS || 0.45));
 }
 export async function startGame(page, seed = '4242') {
   await page.goto(process.env.GAME_URL || 'http://localhost:4173/');

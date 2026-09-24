@@ -8,6 +8,7 @@ import { buildShipModel } from '../ship/ShipModel';
 import { allShipClasses } from '../ship/ShipDefs';
 import { events } from '../../core/EventBus';
 import { getItem } from '../../gameplay/Items';
+import { PropFactory, disposeOwnedGeometry } from '../../assets/PropFactory';
 import { CRASH_LOGS, MONOLITH_LORE, RUIN_LORE, TERMINAL_LOGS } from '../../gameplay/Lore';
 
 /**
@@ -58,6 +59,7 @@ export class POIManager {
   pois: POI[] = [];
   private planet: Planet | null = null;
   private mat: THREE.MeshStandardMaterial | null = null;
+  private props: PropFactory | null = null;
   private smokeTimer = 0;
   private cache = new Map<string, POI[]>();
 
@@ -100,9 +102,14 @@ export class POIManager {
     for (const p of this.pois) this.unbuild(p);
     this.mat?.dispose();
     this.mat = null;
+    this.props?.dispose();
+    this.props = null;
     this.planet = planet;
     this.pois = planet ? this.generate(planet, game) : [];
-    if (planet) this.mat = planetPropMaterial(planet.lu, { roughness: 0.6, metalness: 0.3, key: 'poi' });
+    if (planet) {
+      this.mat = planetPropMaterial(planet.lu, { roughness: 0.6, metalness: 0.3, key: 'poi' });
+      this.props = new PropFactory(planet.lu, 'poi-asset');
+    }
   }
 
   markKnown(poi: POI, game: Game): void {
@@ -237,7 +244,7 @@ export class POIManager {
 
   private unbuild(p: POI): void {
     if (!p.group) return;
-    p.group.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+    disposeOwnedGeometry(p.group);
     p.group.removeFromParent();
     p.group = null;
     p.colliders = [];
@@ -279,9 +286,28 @@ export class POIManager {
     const warm = new THREE.Color(1, 0.6, 0.25);
     const cyan = new THREE.Color(0.3, 0.9, 1.0);
     const lootKey = `${p.id}:loot`;
+    /** Place an imported prop (CC0 / NASA model); returns false when unavailable. */
+    const prop = (key: string, size: number, x: number, y: number, z: number, yaw = 0, axis: 'y' | 'max' = 'max', tilt?: THREE.Euler): boolean => {
+      const o = this.props?.make(key, size, axis);
+      if (!o) return false;
+      o.position.set(x, y, z);
+      if (tilt) o.rotation.copy(tilt);
+      o.rotateY(yaw);
+      group.add(o);
+      return true;
+    };
 
     switch (p.type) {
       case 'crash': {
+        const lander = rng.chance(0.3) && prop('nasa/lunar_module', 7.5, 0, -0.4, 0, rng.range(0, 6), 'max', new THREE.Euler(rng.range(0.15, 0.35), 0, rng.range(-0.3, 0.3)));
+        for (let i = 0; i < 3; i++) {
+          const a = rng.range(0, Math.PI * 2);
+          const r = rng.range(7, 14);
+          prop(i === 0 ? 'scifi/Prop_Barrel_Large' : 'scifi/Prop_Crate4', i === 0 ? 1.1 : 1.0, Math.cos(a) * r, -0.1, Math.sin(a) * r, rng.range(0, 6), 'y', new THREE.Euler(rng.range(-0.5, 0.5), 0, rng.range(-1.2, 1.2)));
+        }
+        if (lander) {
+          prop('scifi/Prop_Chest', 1.6, 4, 0, 3, 0.4);
+        } else {
         const cls = allShipClasses()[rng.int(0, 3)];
         const model = buildShipModel(cls, p.seed);
         model.group.traverse((o) => {
@@ -293,13 +319,16 @@ export class POIManager {
         model.group.rotation.set(rng.range(-0.25, 0.1), rng.range(0, 3), rng.range(0.2, 0.6));
         model.group.scale.setScalar(1.15);
         group.add(model.group);
+        }
         for (let i = 0; i < 12; i++) {
           const a = rng.range(0, Math.PI * 2);
           const r = rng.range(6, 22);
           b.add(rockGeometry(rng, 0, 0.5), i % 3 ? dark : metal, trs(Math.cos(a) * r, 0.1, Math.sin(a) * r, 0, 0, 0, rng.range(0.3, 1.2)));
         }
-        b.add(box(1.2, 0.8, 0.8), dark, trs(4, 0.4, 3));
-        b.add(box(0.3, 0.1, 0.3), warm, trs(4, 0.85, 3), 3);
+        if (!lander) {
+          b.add(box(1.2, 0.8, 0.8), dark, trs(4, 0.4, 3));
+          b.add(box(0.3, 0.1, 0.3), warm, trs(4, 0.85, 3), 3);
+        }
         addMesh(b.build());
         p.colliders.push({ local: toLocal(0, 0, 0), radius: 5, height: 5 });
         if (!this.looted(game, lootKey)) {
@@ -352,17 +381,37 @@ export class POIManager {
       }
       case 'outpost': {
         const wall = new THREE.Color().setHSL(rng.next(), 0.1, 0.6);
-        b.add(sphere(5, 16, 8), wall, trs(0, 0, 0, 0, 0, 0, 1, 0.8, 1));
-        b.add(box(3, 2.4, 0.2), dark, trs(0, 1.2, 4.9));
-        b.add(box(2.6, 0.2, 0.25), warm, trs(0, 2.5, 5.0), 3);
-        b.add(box(6, 3, 4), wall, trs(8, 1.5, 0));
-        b.add(box(6.1, 0.3, 4.1), dark, trs(8, 3, 0));
-        for (let i = 0; i < 3; i++) b.add(box(0.8, 0.5, 0.1), cyan, trs(6.2 + i * 1.4, 2, 2.05), 2);
+        // KayKit modular base when available, procedural dome otherwise
+        const kit = prop(rng.pick(['spacebase/basemodule_E', 'spacebase/basemodule_A', 'spacebase/basemodule_D']), 10, 0, 0, 0, Math.PI);
+        if (kit) {
+          prop(rng.pick(['spacebase/cargodepot_A', 'spacebase/cargodepot_B', 'spacebase/basemodule_garage']), 7, 8.5, 0, 0, -Math.PI / 2);
+          prop('spacebase/landingpad_large', 10, -4, -0.15, 12);
+          prop('spacebase/roofmodule_solarpanels', 4.5, 8.5, 3.2, 0);
+          prop(rng.pick(['spacebase/windturbine_tall', 'spacebase/structure_tall']), 8, -9, 0, -6, rng.range(0, 6), 'y');
+          if (rng.chance(0.5)) prop('nasa/habitat', 11, -14, 0, 4, rng.range(0, 6));
+          if (rng.chance(0.6)) prop(rng.pick(['nasa/sev_rover', 'spacebase/spacetruck_large']), 6, 12, 0, 11, rng.range(0, 6));
+          else prop('spacebase/lander_A', 5, 12, 0, 11, rng.range(0, 6));
+          prop('nasa/eva_suit', 1.85, 3.6, 0, 6.2, -0.5, 'y');
+          prop('scifi/Prop_Light_Floor', 1.3, -1.6, 0, 5.8);
+          prop('scifi/Prop_Barrel_Large', 1.1, 5, 0, -5, 0, 'y');
+          prop('scifi/Prop_Barrel_Large', 1.1, 5.6, 0, -4.3, 1, 'y');
+        } else {
+          b.add(sphere(5, 16, 8), wall, trs(0, 0, 0, 0, 0, 0, 1, 0.8, 1));
+          b.add(box(3, 2.4, 0.2), dark, trs(0, 1.2, 4.9));
+          b.add(box(2.6, 0.2, 0.25), warm, trs(0, 2.5, 5.0), 3);
+          b.add(box(6, 3, 4), wall, trs(8, 1.5, 0));
+          b.add(box(6.1, 0.3, 4.1), dark, trs(8, 3, 0));
+          for (let i = 0; i < 3; i++) b.add(box(0.8, 0.5, 0.1), cyan, trs(6.2 + i * 1.4, 2, 2.05), 2);
+          b.add(column(5, 5, 16), new THREE.Color(0.25, 0.26, 0.28), trs(-4, 0, 12, 0, 0, 0, 1, 0.3, 1));
+          for (let i = 0; i < 6; i++) b.add(box(0.3, 0.1, 0.3), cyan, trs(-4 + Math.cos(i) * 4.6, 0.35, 12 + Math.sin(i) * 4.6), 3);
+        }
         b.add(column(0.15, 0.2, 5), dark, trs(-6, 0, -3, 0, 0, 0, 1, 12, 1));
         b.add(ico(0.35, 0), new THREE.Color(1, 0.2, 0.2), trs(-6, 12.2, -3), 4);
-        b.add(column(5, 5, 16), new THREE.Color(0.25, 0.26, 0.28), trs(-4, 0, 12, 0, 0, 0, 1, 0.3, 1));
-        for (let i = 0; i < 6; i++) b.add(box(0.3, 0.1, 0.3), cyan, trs(-4 + Math.cos(i) * 4.6, 0.35, 12 + Math.sin(i) * 4.6), 3);
         addMesh(b.build());
+        if (kit) {
+          p.colliders.push({ local: toLocal(0, 0, 0), radius: 4.6, height: 5 });
+          p.colliders.push({ local: toLocal(-9, 0, -6), radius: 1.2, height: 8 });
+        }
         p.colliders.push({ local: toLocal(8, 0, 0), radius: 3.3, height: 3 });
         p.colliders.push({ local: toLocal(-6, 0, -3), radius: 0.4, height: 12 });
         p.shelterRadius = 6;
@@ -372,8 +421,8 @@ export class POIManager {
           const ck = `${p.id}:crate${c}`;
           const cx = rng.range(-3, 3), cz = rng.range(-10, -5);
           const cb = new GeoBuilder();
-          cb.add(box(1.2, 0.8, 0.8), new THREE.Color(0.35, 0.37, 0.4), trs(cx, 0.4, cz));
-          if (!this.looted(game, ck)) cb.add(box(1.25, 0.08, 0.1), warm, trs(cx, 0.6, cz + 0.41), 3);
+          if (!prop(c % 2 ? 'scifi/Prop_Crate3' : 'scifi/Prop_Chest', c % 2 ? 1.0 : 1.5, cx, 0, cz, rng.range(-0.3, 0.3))) cb.add(box(1.2, 0.8, 0.8), new THREE.Color(0.35, 0.37, 0.4), trs(cx, 0.4, cz));
+          if (!this.looted(game, ck)) cb.add(box(1.25, 0.08, 0.1), warm, trs(cx, c % 2 ? 1.05 : 1.0, cz + 0.2), 3);
           addMesh(cb.build());
           if (!this.looted(game, ck)) {
             p.interactables.push({
@@ -400,8 +449,10 @@ export class POIManager {
           }
         }
         const tk = `${p.id}:terminal`;
-        const tb = new GeoBuilder().add(box(0.8, 1.4, 0.4), dark, trs(2.5, 0.7, 5.5)).add(box(0.6, 0.4, 0.05), cyan, trs(2.5, 1.2, 5.72, -0.3, 0, 0), 2.5);
-        addMesh(tb.build());
+        if (!prop('scifi/Prop_Computer', 1.6, 2.5, 0, 5.5, Math.PI, 'y')) {
+          const tb = new GeoBuilder().add(box(0.8, 1.4, 0.4), dark, trs(2.5, 0.7, 5.5)).add(box(0.6, 0.4, 0.05), cyan, trs(2.5, 1.2, 5.72, -0.3, 0, 0), 2.5);
+          addMesh(tb.build());
+        }
         if (!this.looted(game, tk)) {
           p.interactables.push({
             key: tk, local: toLocal(2.5, 1, 5.5), radius: 1, prompt: 'Access terminal',
@@ -423,6 +474,15 @@ export class POIManager {
         b.add(box(0.8, 1.2, 0.5), dark, trs(1.4, 0.6, 0));
         b.add(box(0.5, 0.3, 0.05), new THREE.Color(0.3, 1, 0.6), trs(1.4, 0.9, 0.26), 3);
         addMesh(b.build());
+        // survey team left their equipment behind
+        if (rng.chance(0.65)) {
+          prop('nasa/perseverance', 3.1, 5, 0, 3, rng.range(0, 6));
+          prop('nasa/ingenuity', 1.2, -3.5, 0, 4, rng.range(0, 6));
+          p.colliders.push({ local: toLocal(5, 0, 3), radius: 1.6, height: 2 });
+        } else {
+          prop('spacebase/solarpanel', 2.6, -3, 0, 2, rng.range(0, 6));
+          prop('spacebase/cargo_A_stacked', 1.8, 3, 0, -2.5, rng.range(0, 6));
+        }
         p.colliders.push({ local: toLocal(0, 0, 0), radius: 1, height: 9 });
         const bk = `${p.id}:beacon`;
         if (!this.looted(game, bk)) {
@@ -483,6 +543,8 @@ export class POIManager {
         b.add(rockGeometry(rng, 1, 0.5), dark, trs(0, 0, 0, 0, 0, 0, 3.5));
         addMesh(b.build());
         p.colliders.push({ local: toLocal(0, 0, 0), radius: 3, height: 5 });
+        if (prop('spacebase/drill_structure', 7, 7, 0, -2, rng.range(0, 6), 'y')) p.colliders.push({ local: toLocal(7, 0, -2), radius: 3, height: 7 });
+        prop('spacebase/cargo_B_packed', 1.2, 5, 0, 3, rng.range(0, 6));
         const dk = `${p.id}:deposit`;
         if (!this.looted(game, dk)) {
           p.interactables.push({

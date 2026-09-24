@@ -35,6 +35,7 @@ import type { Station } from '../world/Station';
 import { RNG } from './Random';
 import { Inventory } from '../gameplay/Inventory';
 import { getShipClass } from '../entities/ship/ShipDefs';
+import { assets } from '../assets/AssetLibrary';
 
 export type GameMode = 'menu' | 'loading' | 'foot' | 'ship' | 'docked' | 'warp' | 'dead';
 
@@ -169,6 +170,10 @@ export class Game {
 
   private async boot(data: SaveData, fresh: boolean): Promise<void> {
     this.mode = 'loading';
+    if (!assets.loaded) {
+      this.ui.showLoading('Loading assets…', 0);
+      await assets.loadAll((p) => this.ui.showLoading('Loading assets…', p));
+    }
     this.ui.showLoading('Generating star system…', 0);
     this.state = new GameState(data);
     this.missions ??= new Missions(this);

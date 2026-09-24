@@ -36,6 +36,26 @@ export interface Species {
   rarity: number; // spawn weight
   diet: string;
   notes: string;
+  /** Animated model (asset key) used for this species, or null for a procedural body. */
+  model: string | null;
+}
+
+/** CC0 Quaternius animated models suitable for each body plan. */
+const MODELS: Record<BodyPlan, { calm: string[]; hostile: string[] }> = {
+  quadruped: { calm: ['alpaca', 'bull', 'stag', 'fox', 'chicken_cow'], hostile: ['wolf_basic', 'greyjaw', 'bull'] },
+  biped: { calm: ['yeti', 'frog'], hostile: ['velociraptor', 'orcenemy', 'yeti'] },
+  hexapod: { calm: ['crabenemy', 'spider'], hostile: ['spider', 'crabenemy'] },
+  hopper: { calm: ['frog'], hostile: ['frog'] },
+  flyer: { calm: ['glubevolved', 'ghost', 'golelingevolved', 'dragonevolved'], hostile: ['dragonevolved', 'demon'] },
+  serpent: { calm: [], hostile: [] },
+};
+
+function pickModel(seed: number, plan: BodyPlan, temperament: Temperament): string | null {
+  const r = new RNG(seed ^ 0x3a0d);
+  const list = temperament === 'aggressive' ? MODELS[plan].hostile : MODELS[plan].calm;
+  // a share of species keep a procedural body so every world still has something truly alien
+  if (!list.length || r.chance(0.18)) return null;
+  return `creatures/${r.pick(list)}`;
 }
 
 const DIETS = ['Herbivore', 'Omnivore', 'Carnivore', 'Lithovore', 'Photosynthetic', 'Filter feeder'];
@@ -91,6 +111,7 @@ export function generateSpecies(planet: PlanetDesc): Species[] {
       rarity: r.range(0.4, 1.2) * (small ? 1.3 : 1),
       diet: temperament === 'aggressive' ? 'Carnivore' : r.pick(DIETS),
       notes: r.pick(NOTES),
+      model: pickModel(seed, plan, temperament),
     });
   }
   return out;

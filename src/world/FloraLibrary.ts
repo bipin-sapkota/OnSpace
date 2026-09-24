@@ -4,13 +4,14 @@ import { GeoBuilder, column, cone, ico, rockGeometry, trs, jitterGeometry, betwe
 import type { TerrainParams, RGB } from '../universe/types';
 import { ScatterType, SCATTER_TYPE_COUNT } from './terrain/ChunkBuilder';
 import { getItem } from '../gameplay/Items';
+import { assets, type ModelPart } from '../assets/AssetLibrary';
 
 /**
  * Builds the per-planet library of flora, rock and crystal meshes. Geometry is
  * generated from the planet seed and its flora style so each world has its own
  * recognisable plant life while sharing one visual language.
  */
-export const VARIANTS = 2;
+export const VARIANTS = 3;
 
 export interface ScatterTypeInfo {
   harvest: { item: string; min: number; max: number } | null;
@@ -20,13 +21,48 @@ export interface ScatterTypeInfo {
   height: number; // approx height factor for targeting centre
   sway: number;
   maxDist: number; // render distance for the chunk group
+  /** Detailed (imported) models are drawn up to this distance; the procedural mesh beyond it. */
+  nearDist: number;
 }
+
+/** How strongly imported textures are pulled toward the planet palette. */
+const TINT_AMOUNT: Record<string, number> = { verdant: 0.12, ocean: 0.2, arid: 0.45, frozen: 0.55, volcanic: 0.7, toxic: 0.75, exotic: 0.85, barren: 0.5 };
+
+/** A detailed model part with the palette tint to apply to its material. */
+export interface TintedPart extends ModelPart {
+  tint: THREE.Color;
+  tintAmount: number;
+  /** Grass/ground cover is lit like the ground (normals up). */
+  groundLit: boolean;
+  /** Leaves, grass, flowers: two-sided without back-face normal flipping. */
+  foliage: boolean;
+}
+
+const range = (name: string, n: number) => Array.from({ length: n }, (_, i) => `nature/${name}_${i + 1}`);
+const TREES = {
+  common: range('CommonTree', 5),
+  pine: range('Pine', 5),
+  twisted: range('TwistedTree', 5),
+  dead: range('DeadTree', 5),
+};
+/** Height (metres at instance scale 1) each detailed model is normalised to. */
+const TARGET_HEIGHT: Partial<Record<number, number>> = {
+  [ScatterType.Tree]: 8,
+  [ScatterType.Bush]: 1.2,
+  [ScatterType.Grass]: 0.6,
+};
+const TARGET_SIZE: Partial<Record<number, number>> = {
+  [ScatterType.Rock]: 1.6,
+  [ScatterType.Boulder]: 2.2,
+};
 
 const lin = (c: RGB) => new THREE.Color().setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace);
 
 export class FloraLibrary {
   readonly geometries: THREE.BufferGeometry[][] = [];
   readonly info: ScatterTypeInfo[] = [];
+  /** Detailed imported model per [type][variant], or null to use the procedural mesh only. */
+  readonly models: (TintedPart[] | null)[][] = [];
 
   constructor(params: TerrainParams, archetype: string) {
     const rng = new RNG(params.seed ^ 0xf10a);
@@ -53,15 +89,126 @@ export class FloraLibrary {
       this.geometries[ScatterType.OxyPlant].push(this.oxyPlant(vr, leaf));
     }
 
-    const inf = (o: Partial<ScatterTypeInfo>): ScatterTypeInfo => ({ harvest: null, health: 1, collide: 0, hitRadius: 1, height: 1, sway: 0, maxDist: 1e9, ...o });
-    this.info[ScatterType.Tree] = inf({ harvest: { item: 'biomass', min: 14, max: 26 }, health: 1.4, collide: 0.45, hitRadius: 1.4, height: 3, sway: 0.06, maxDist: 2200 });
-    this.info[ScatterType.Bush] = inf({ harvest: { item: 'biomass', min: 4, max: 9 }, health: 0.5, hitRadius: 1.0, height: 0.6, sway: 0.1, maxDist: 700 });
-    this.info[ScatterType.Grass] = inf({ sway: 0.25, maxDist: 190 });
-    this.info[ScatterType.Rock] = inf({ harvest: { item: 'ferrox', min: 6, max: 12 }, health: 0.8, hitRadius: 1.0, height: 0.3, maxDist: 600 });
-    this.info[ScatterType.Boulder] = inf({ harvest: { item: 'ferrox', min: 30, max: 55 }, health: 3.2, collide: 0.9, hitRadius: 1.1, height: 0.6, maxDist: 2500 });
+    const inf = (o: Partial<ScatterTypeInfo>): ScatterTypeInfo => ({ harvest: null, health: 1, collide: 0, hitRadius: 1, height: 1, sway: 0, maxDist: 1e9, nearDist: 0, ...o });
+    this.info[ScatterType.Tree] = inf({ harvest: { item: 'biomass', min: 14, max: 26 }, health: 1.4, collide: 0.45, hitRadius: 1.4, height: 3, sway: 0.06, maxDist: 2200, nearDist: 200 });
+    this.info[ScatterType.Bush] = inf({ harvest: { item: 'biomass', min: 4, max: 9 }, health: 0.5, hitRadius: 1.0, height: 0.6, sway: 0.1, maxDist: 700, nearDist: 260 });
+    this.info[ScatterType.Grass] = inf({ sway: 0.25, maxDist: 190, nearDist: 190 });
+    this.info[ScatterType.Rock] = inf({ harvest: { item: 'ferrox', min: 6, max: 12 }, health: 0.8, hitRadius: 1.0, height: 0.3, maxDist: 600, nearDist: 320 });
+    this.info[ScatterType.Boulder] = inf({ harvest: { item: 'ferrox', min: 30, max: 55 }, health: 3.2, collide: 0.9, hitRadius: 1.1, height: 0.6, maxDist: 2500, nearDist: 2500 });
     this.info[ScatterType.Crystal] = inf({ harvest: { item: crystalItem, min: 12, max: 22 }, health: 1.1, hitRadius: 0.9, height: 1.0, maxDist: 1200 });
     this.info[ScatterType.Node] = inf({ harvest: { item: 'ferrox', min: 35, max: 65 }, health: 3.0, collide: 0.8, hitRadius: 1.4, height: 0.8, maxDist: 2500 });
     this.info[ScatterType.OxyPlant] = inf({ harvest: { item: 'aerolite', min: 14, max: 24 }, health: 0.7, hitRadius: 0.9, height: 0.8, sway: 0.05, maxDist: 900 });
+
+    this.pickModels(new RNG(params.seed ^ 0x3d1), style, archetype, lin(fc[0]).lerp(lin(fc[1]), 0.5), bark, rockCol);
+  }
+
+  /**
+   * Choose detailed (CC0 Quaternius) models for this planet's flora style.
+   * Styles without a fitting real-world analogue (crystal trees, cacti,
+   * glowing fungus) keep their procedural meshes for part of the variants so
+   * alien worlds still look alien.
+   */
+  private pickModels(rng: RNG, style: number, archetype: string, leaf: THREE.Color, bark: THREE.Color, rock: THREE.Color): void {
+    for (let t = 0; t < SCATTER_TYPE_COUNT; t++) this.models.push(new Array(VARIANTS).fill(null));
+    if (!assets.loaded) return;
+    const amt = TINT_AMOUNT[archetype] ?? 0.3;
+    const lists: Partial<Record<number, (string | null)[]>> = {};
+    const frozen = archetype === 'frozen';
+    const scorched = archetype === 'volcanic' || archetype === 'barren';
+    switch (style) {
+      case 0: // broadleaf
+        lists[ScatterType.Tree] = TREES.common;
+        lists[ScatterType.Bush] = ['nature/Bush_Common', 'nature/Bush_Common_Flowers', 'nature/Fern_1', 'nature/Plant_1_Big'];
+        lists[ScatterType.Grass] = ['nature/Grass_Common_Short', 'nature/Grass_Common_Tall', 'nature/Flower_3_Group', 'nature/Flower_4_Group', 'nature/Clover_1'];
+        break;
+      case 1: // conifer
+        lists[ScatterType.Tree] = frozen ? [...TREES.pine, ...TREES.dead.slice(0, 2)] : TREES.pine;
+        lists[ScatterType.Bush] = ['nature/Fern_1', 'nature/Bush_Common', 'nature/Plant_1'];
+        lists[ScatterType.Grass] = ['nature/Grass_Wispy_Short', 'nature/Grass_Wispy_Tall', 'nature/Grass_Common_Short'];
+        break;
+      case 2: // desert: keep one procedural cactus variant among dead/twisted trees
+        lists[ScatterType.Tree] = [null, ...TREES.dead, TREES.twisted[0], TREES.twisted[3]];
+        lists[ScatterType.Bush] = ['nature/Plant_7', 'nature/Plant_7_Big', 'nature/Plant_1'];
+        lists[ScatterType.Grass] = ['nature/Grass_Wispy_Short', 'nature/Grass_Wispy_Tall'];
+        break;
+      case 3: // fungal: giant mushrooms beside procedural glowing caps
+        lists[ScatterType.Tree] = [null, 'nature/Mushroom_Laetiporus', 'nature/Mushroom_Common', ...TREES.twisted.slice(0, 2)];
+        lists[ScatterType.Bush] = ['nature/Mushroom_Common', 'nature/Mushroom_Laetiporus', 'nature/Fern_1'];
+        lists[ScatterType.Grass] = ['nature/Clover_1', 'nature/Grass_Wispy_Short'];
+        break;
+      case 4: // crystalline: trees stay procedural, ground cover is real
+        lists[ScatterType.Tree] = scorched ? TREES.dead : [null, null, ...(frozen ? TREES.dead.slice(2) : TREES.twisted.slice(2))];
+        lists[ScatterType.Bush] = [null, 'nature/Plant_7', 'nature/Fern_1'];
+        lists[ScatterType.Grass] = ['nature/Grass_Wispy_Short', 'nature/Grass_Wispy_Tall'];
+        break;
+      case 5: // coral / tendril
+        lists[ScatterType.Tree] = [null, ...TREES.twisted];
+        lists[ScatterType.Bush] = ['nature/Plant_1_Big', 'nature/Plant_7_Big', 'nature/Bush_Common'];
+        lists[ScatterType.Grass] = ['nature/Grass_Wispy_Tall', 'nature/Clover_1', 'nature/Flower_4_Group'];
+        break;
+    }
+    lists[ScatterType.Rock] = ['nature/Rock_Medium_1', 'nature/Rock_Medium_2', 'nature/Rock_Medium_3'];
+    lists[ScatterType.Boulder] = ['nature/Rock_Medium_1', 'nature/Rock_Medium_2', 'nature/Rock_Medium_3'];
+
+    const pool = (arr: (string | null)[]) => {
+      const a = arr.slice();
+      rng.shuffle(a);
+      return a;
+    };
+    for (const [tStr, list] of Object.entries(lists)) {
+      const t = Number(tStr) as ScatterType;
+      if (!list?.length) continue;
+      const picks = pool(list);
+      for (let v = 0; v < VARIANTS; v++) {
+        const key = picks[v % picks.length];
+        if (!key) continue;
+        const parts = this.normalised(key, t, v, leaf, bark, rock, amt);
+        if (parts) this.models[t][v] = parts;
+      }
+    }
+  }
+
+  private normalised(key: string, type: ScatterType, variant: number, leaf: THREE.Color, bark: THREE.Color, rock: THREE.Color, amt: number): TintedPart[] | null {
+    const m = assets.instanceModel(key);
+    if (!m) return null;
+    const isRock = type === ScatterType.Rock || type === ScatterType.Boulder;
+    let s: number;
+    if (isRock) s = (TARGET_SIZE[type] ?? 1) / Math.max(m.size.x, m.size.y, m.size.z);
+    else s = ((TARGET_HEIGHT[type] ?? 1) * (type === ScatterType.Tree ? 0.85 + variant * 0.12 : 1)) / m.height;
+    // mushrooms promoted to trees become giant
+    if (type === ScatterType.Tree && key.includes('Mushroom')) s *= 1.1;
+    const groundLit = type === ScatterType.Grass;
+    return m.parts.map((p) => {
+      const g = p.geometry.clone();
+      g.scale(s, s, s);
+      // rocks sit partly buried like the procedural ones
+      if (isRock) g.translate(0, -m.height * s * 0.3, 0);
+      const name = p.material.name ?? '';
+      const isBark = /Bark/i.test(name);
+      const isRockMat = /Rock/i.test(name);
+      const foliage = !isBark && !isRockMat;
+      if (groundLit) {
+        const n = g.attributes.normal;
+        for (let i = 0; i < n.count; i++) n.setXYZ(i, 0, 1, 0);
+      } else if (foliage && (type === ScatterType.Tree || type === ScatterType.Bush)) {
+        // leaf cards shade like a soft volume: normals radiate from the canopy centre
+        g.computeBoundingBox();
+        const c = g.boundingBox!.getCenter(new THREE.Vector3());
+        const pos = g.attributes.position;
+        const n = g.attributes.normal;
+        const v = new THREE.Vector3();
+        for (let i = 0; i < n.count; i++) {
+          v.fromBufferAttribute(pos, i).sub(c).normalize();
+          v.y = v.y * 0.6 + 0.5;
+          v.normalize();
+          n.setXYZ(i, v.x, v.y, v.z);
+        }
+      }
+      g.computeBoundingSphere();
+      const tint = isRockMat ? rock : isBark ? bark : leaf;
+      const tintAmount = isRockMat ? 0.55 : isBark ? amt * 0.6 : amt;
+      return { geometry: g, material: p.material, tint, tintAmount, groundLit, foliage };
+    });
   }
 
   private tree(rng: RNG, style: number, bark: THREE.Color, leaf: THREE.Color, leaf2: THREE.Color, accent: THREE.Color): THREE.BufferGeometry {
@@ -256,5 +403,6 @@ export class FloraLibrary {
 
   dispose(): void {
     for (const arr of this.geometries) for (const g of arr) g.dispose();
+    for (const arr of this.models) for (const parts of arr) if (parts) for (const p of parts) p.geometry.dispose();
   }
 }

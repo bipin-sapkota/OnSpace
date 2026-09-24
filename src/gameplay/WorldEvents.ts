@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { assets } from '../assets/AssetLibrary';
 import type { Game } from '../core/Game';
 import type { Planet } from '../world/Planet';
 import { GeoBuilder, ico, rockGeometry, trs } from '../render/GeoKit';
@@ -145,14 +146,19 @@ export class WorldEvents {
 
   private spawnDerelict(game: Game): void {
     const rng = new RNG((Date.now() >>> 3) + this.seq++);
-    const cls = allShipClasses()[rng.int(0, 3)];
-    const model = buildShipModel(cls, rng.int(0, 1e6));
-    model.gear.visible = false;
-    for (const g of model.engineGlow) g.visible = false;
-    model.group.scale.setScalar(6);
-    const pos = game.ship.pos.clone().add(new THREE.Vector3().randomDirection().multiplyScalar(9000 + rng.range(0, 6000)));
+    // half of the wrecks are derelict probes (NASA Dawn model, public domain)
+    const probe = rng.chance(0.5) ? assets.prop('nasa/dawn', 110) : null;
     const holder = new THREE.Group();
-    holder.add(model.group);
+    if (probe) holder.add(probe);
+    else {
+      const cls = allShipClasses()[rng.int(0, 3)];
+      const model = buildShipModel(cls, rng.int(0, 1e6));
+      model.gear.visible = false;
+      for (const g of model.engineGlow) g.visible = false;
+      model.group.scale.setScalar(6);
+      holder.add(model.group);
+    }
+    const pos = game.ship.pos.clone().add(new THREE.Vector3().randomDirection().multiplyScalar(9000 + rng.range(0, 6000)));
     holder.position.copy(pos);
     holder.rotation.set(rng.range(0, 3), rng.range(0, 3), rng.range(0, 3));
     game.world.root.add(holder);

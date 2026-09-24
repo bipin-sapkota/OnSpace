@@ -9,7 +9,7 @@ page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') 
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}\n${e.stack}`));
 const scenario = (await import(path.resolve(process.argv[2]))).default;
 let n = 0;
-const shot = async (name) => { await page.screenshot({ path: `screenshots/${name}.png` }); console.log('shot', name); };
+const shot = async (name) => { await page.screenshot({ path: `screenshots/${name}.png`, timeout: 180000 }); console.log('shot', name); };
 try {
   await scenario(page, shot);
 } catch (e) { console.log('SCENARIO ERROR', e); }

@@ -2,6 +2,40 @@ import * as THREE from 'three';
 import { patchPlanetMaterial, type PlanetLightUniforms } from '../../render/PlanetLighting';
 import { getNoiseTexture } from '../../render/Textures';
 import type { TerrainParams } from '../../universe/types';
+import { assets, type TerrainMaterialId } from '../../assets/AssetLibrary';
+
+/**
+ * ambientCG (CC0) detail layers per archetype: [flat ground, alternate patches, cliffs, peaks/snow].
+ * The layers add close-range texture and relief; colour still comes from the
+ * planet palette (vertex colours) so every world keeps its own look.
+ */
+const DETAIL_LAYERS: Record<string, [TerrainMaterialId, TerrainMaterialId, TerrainMaterialId, TerrainMaterialId]> = {
+  verdant: ['Grass004', 'Ground003', 'Rock023', 'Snow004'],
+  ocean: ['Grass004', 'Ground022', 'Rock005', 'Snow004'],
+  arid: ['Ground010', 'Ground022', 'Rock023', 'Gravel015'],
+  frozen: ['Snow004', 'Ice002', 'Rock005', 'Snow004'],
+  volcanic: ['Gravel015', 'Ground010', 'Rock005', 'Rock023'],
+  toxic: ['Ground003', 'Ground022', 'Rock023', 'Gravel015'],
+  exotic: ['Ground022', 'Grass004', 'Rock005', 'Ice002'],
+  barren: ['Gravel015', 'Ground010', 'Rock023', 'Rock005'],
+};
+/** How much of the texture's own hue survives (0 = palette only). */
+const DETAIL_CHROMA: Record<string, number> = { verdant: 0.45, ocean: 0.4, arid: 0.3, frozen: 0.2, volcanic: 0.15, toxic: 0.1, exotic: 0.05, barren: 0.25 };
+
+const DETAIL_GLSL = /* glsl */ `
+uniform highp sampler2DArray uDetailTex;
+uniform vec4 uLayers;
+uniform vec3 uMean[4];
+uniform float uChroma;
+vec4 triArr(vec3 p, vec3 w, float layer) {
+  vec4 r = vec4(0.0);
+  if (w.x > 0.02) r += texture(uDetailTex, vec3(p.yz, layer)) * w.x;
+  if (w.y > 0.02) r += texture(uDetailTex, vec3(p.xz, layer)) * w.y;
+  if (w.z > 0.02) r += texture(uDetailTex, vec3(p.xy, layer)) * w.z;
+  return r / max(w.x * step(0.02, w.x) + w.y * step(0.02, w.y) + w.z * step(0.02, w.z), 1e-3);
+}
+`;
+
 
 const PERTURB = /* glsl */ `
 uniform sampler2D uNoiseTex;
@@ -21,18 +55,29 @@ vec4 tri(vec3 p, vec3 w) {
 }
 `;
 
-export function createTerrainMaterial(u: PlanetLightUniforms): THREE.MeshStandardMaterial {
+export function createTerrainMaterial(u: PlanetLightUniforms, archetype = 'verdant'): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({
     vertexColors: true,
     roughness: 0.93,
     metalness: 0.0,
   });
+  const tex = assets.terrainTex;
+  const ids = DETAIL_LAYERS[archetype] ?? DETAIL_LAYERS.verdant;
+  const layers = ids.map((id) => assets.terrainLayer(id));
+  const detail = !!tex && layers.every((l) => l >= 0);
+  const extra: Record<string, THREE.IUniform> = { uNoiseTex: { value: getNoiseTexture() } };
+  if (detail) {
+    extra.uDetailTex = { value: tex };
+    extra.uLayers = { value: new THREE.Vector4(...layers) };
+    extra.uMean = { value: layers.map((l) => new THREE.Vector3(...assets.terrainMeans[l])) };
+    extra.uChroma = { value: DETAIL_CHROMA[archetype] ?? 0.3 };
+  }
   patchPlanetMaterial(mat, u, {
-    key: 'terrain-v1',
-    extraUniforms: { uNoiseTex: { value: getNoiseTexture() } },
+    key: detail ? 'terrain-v2-detail' : 'terrain-v2',
+    extraUniforms: extra,
     vertDecl: 'varying vec3 vLocalNormal;',
     vertBody: 'vLocalNormal = normal;',
-    fragDecl: PERTURB,
+    fragDecl: (detail ? '#define USE_DETAIL\n' + DETAIL_GLSL : '') + PERTURB,
     fragColor: /* glsl */ `
       vec3 _N = normalize(vLocalNormal);
       vec3 _w = pow(abs(_N), vec3(4.0)); _w /= (_w.x + _w.y + _w.z);
@@ -52,6 +97,31 @@ export function createTerrainMaterial(u: PlanetLightUniforms): THREE.MeshStandar
       float _strata = 0.78 + 0.44 * sin(dot(_P, vPlanetUp) * 0.35 + _n1.r * 7.0);
       diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * _strata, _rockMask);
       float _bump = _fine * 0.35 + _mid * 0.65 + _rockMask * _n1.b * 0.4;
+      #ifdef USE_DETAIL
+      {
+        // photographic ground detail close to the camera
+        float _near = 1.0 - smoothstep(70.0, 320.0, _dist);
+        if (_near > 0.001) {
+          vec3 _dp = _P * 0.21;
+          float _cliffW = smoothstep(0.2, 0.38, _slope);
+          float _white = min(min(vColor.r, vColor.g), vColor.b);
+          float _topW = smoothstep(0.55, 0.8, _white) * (1.0 - _cliffW);
+          float _altW = smoothstep(0.45, 0.62, _n1.r * 0.7 + _n1b.g * 0.3) * (1.0 - _cliffW) * (1.0 - _topW);
+          float _flatW = max(0.0, 1.0 - _cliffW - _topW - _altW);
+          vec4 _acc = vec4(0.0);
+          vec3 _mean = vec3(0.0);
+          if (_flatW > 0.01) { _acc += triArr(_dp, _w, uLayers.x) * _flatW; _mean += uMean[0] * _flatW; }
+          if (_altW > 0.01) { _acc += triArr(_dp * 0.8, _w, uLayers.y) * _altW; _mean += uMean[1] * _altW; }
+          if (_cliffW > 0.01) { _acc += triArr(_dp * 0.35, _w, uLayers.z) * _cliffW; _mean += uMean[2] * _cliffW; }
+          if (_topW > 0.01) { _acc += triArr(_dp * 0.6, _w, uLayers.w) * _topW; _mean += uMean[3] * _topW; }
+          vec3 _ratio = clamp(_acc.rgb / max(_mean, vec3(0.04)), 0.0, 2.2);
+          vec3 _dr = mix(vec3(dot(_ratio, vec3(0.3333))), _ratio, uChroma);
+          // the procedural fine noise yields to the real texture up close
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb / max(_detail, 0.2) * (0.7 + 0.3 * _detail) * pow(_dr, vec3(1.35)), _near);
+          _bump += (_acc.a - 0.5) * 0.35 * _near;
+        }
+      }
+      #endif
     `,
     fragNormal: /* glsl */ `
       {

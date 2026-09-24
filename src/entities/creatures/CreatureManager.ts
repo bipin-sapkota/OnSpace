@@ -3,6 +3,7 @@ import type { Game } from '../../core/Game';
 import type { Planet } from '../../world/Planet';
 import { generateSpecies, type Species } from './Species';
 import { buildCreature, type CreatureRig } from './CreatureBuilder';
+import { buildModelCreature, playAnim, disposeSpeciesMaterials, type AnimatedBody } from './CreatureModels';
 import { planetPropMaterial } from '../../render/Materials';
 import type { Damageable, Faction } from '../../gameplay/Combat';
 import { events } from '../../core/EventBus';
@@ -21,6 +22,8 @@ const Y = new THREE.Vector3(0, 1, 0);
 export class Creature implements Damageable {
   readonly species: Species;
   readonly rig: CreatureRig;
+  /** Skinned model animation, when the species uses an imported model. */
+  readonly anim: AnimatedBody | null;
   readonly local = new THREE.Vector3();
   readonly heading = new THREE.Vector3(0, 0, -1); // local tangent direction
   readonly pos = new THREE.Vector3(); // universe (updated per frame)
@@ -47,7 +50,9 @@ export class Creature implements Damageable {
   constructor(sp: Species, planet: Planet, material: THREE.Material) {
     this.species = sp;
     this.planet = planet;
-    this.rig = buildCreature(sp, material);
+    const model = buildModelCreature(sp, planet.lu);
+    this.rig = model?.rig ?? buildCreature(sp, material);
+    this.anim = model?.anim ?? null;
     this.radius = Math.max(0.6, sp.size * 0.7);
     this.faction = sp.temperament === 'aggressive' ? 'hostile' : 'wildlife';
     this.label = sp.name;
@@ -127,6 +132,7 @@ export class CreatureManager {
     this.creatures.length = 0;
     this.material?.dispose();
     this.material = null;
+    disposeSpeciesMaterials();
     this.planet = null;
     this.species = [];
   }
@@ -252,7 +258,11 @@ export class CreatureManager {
 
     if (!c.alive) {
       c.deadTime += dt;
-      c.rig.body.rotation.z = Math.min(Math.PI / 2, c.rig.body.rotation.z + dt * 3);
+      if (c.anim) {
+        playAnim(c.anim, 'death', 0.15);
+        if (!c.anim.actions.death) c.rig.body.rotation.z = Math.min(Math.PI / 2, c.rig.body.rotation.z + dt * 3);
+        c.anim.mixer.update(dt);
+      } else c.rig.body.rotation.z = Math.min(Math.PI / 2, c.rig.body.rotation.z + dt * 3);
       if (c.flyHeight > 0) {
         const r = p.surfaceRadius(up);
         const cur = c.local.length();
@@ -311,6 +321,7 @@ export class CreatureManager {
           c.attackCooldown = 1.3;
           const dmg = 6 + sp.size * 5;
           game.player.damage(dmg, sp.name, game);
+          if (c.anim) playAnim(c.anim, 'attack', 0.1);
           game.audio.creatureCall(sp.seed, sp.size, 0.8, 0);
         }
         if (c.stateTime > c.stateDur && c.provoked <= 0 && pd > 30) c.setState('wander', 4);
@@ -341,6 +352,16 @@ export class CreatureManager {
     p.scatter.collide(c.local, c.radius * 0.6);
 
     // animation
+    if (c.anim) {
+      this.animateModel(c, dt, pd);
+      c.callTimer -= dt;
+      if (c.callTimer <= 0) {
+        c.callTimer = 6 + Math.random() * 14;
+        if (pd < 120) game.audio.creatureCall(sp.seed, sp.size, Math.max(0, 1 - pd / 120) * 0.7, 0);
+      }
+      this.applyTransform(c, dir, game);
+      return;
+    }
     c.gait += dt * (c.speed / Math.max(0.3, sp.size)) * 3.2;
     const amp = Math.min(0.7, c.speed / Math.max(0.5, sp.walkSpeed) * 0.35);
     c.rig.legs.forEach((leg, i) => {
@@ -366,6 +387,32 @@ export class CreatureManager {
       if (pd < 120) game.audio.creatureCall(sp.seed, sp.size, Math.max(0, 1 - pd / 120) * 0.7, 0);
     }
     this.applyTransform(c, dir, game);
+  }
+
+  /** Drive the skinned model's clips from the simulation state. */
+  private animateModel(c: Creature, dt: number, playerDist: number): void {
+    const a = c.anim!;
+    const sp = c.species;
+    // attack clips play to completion before locomotion resumes
+    const attacking = a.current === 'attack' && a.actions.attack?.isRunning();
+    if (!attacking) {
+      if (c.speed > Math.max(0.25, sp.walkSpeed * 1.35) && (a.actions.run || a.actions.walk)) {
+        playAnim(a, 'run');
+        a.actions[a.actions.run ? 'run' : 'walk']?.setEffectiveTimeScale(THREE.MathUtils.clamp(c.speed / (a.actions.run ? a.runRef : a.walkRef), 0.6, 2.2));
+      } else if (c.speed > 0.2) {
+        playAnim(a, 'walk');
+        a.actions.walk?.setEffectiveTimeScale(THREE.MathUtils.clamp(c.speed / a.walkRef, 0.5, 2));
+      } else playAnim(a, c.state === 'graze' ? 'graze' : 'idle');
+    }
+    // distant animals animate at a reduced rate to save CPU
+    if (playerDist < 120) a.mixer.update(dt);
+    else {
+      c.gait += dt;
+      if (c.gait > 0.1) {
+        a.mixer.update(c.gait);
+        c.gait = 0;
+      }
+    }
   }
 
   private applyTransform(c: Creature, up: THREE.Vector3, game: Game): void {

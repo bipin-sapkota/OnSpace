@@ -1,9 +1,11 @@
 import * as THREE from 'three';
+import { mergeGeometries as mergeParts } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RNG, hashCombine } from '../core/Random';
 import { GeoBuilder, rockGeometry, ico, trs } from '../render/GeoKit';
 import { propMaterial } from '../render/Materials';
 import type { AsteroidBeltDesc } from '../universe/types';
 import { getItem } from '../gameplay/Items';
+import { assets } from '../assets/AssetLibrary';
 
 export interface Asteroid {
   id: string;
@@ -20,6 +22,20 @@ export interface Asteroid {
 const CELL = 1600;
 const VARIANTS = 3;
 const CAPACITY = 1800;
+
+/** Asteroid Bennu shape model (NASA, public domain) normalised to unit radius. */
+function bennuGeometry(): THREE.BufferGeometry | null {
+  const m = assets.instanceModel('nasa/bennu');
+  if (!m) return null;
+  const g = mergeParts(m.parts.map((p) => p.geometry));
+  if (!g) return null;
+  g.computeBoundingBox();
+  const c = g.boundingBox!.getCenter(new THREE.Vector3());
+  g.translate(-c.x, -c.y, -c.z);
+  const s = 2 / Math.max(m.size.x, m.size.y, m.size.z);
+  g.scale(s, s, s);
+  return g;
+}
 
 /**
  * Streams asteroids around the player from deterministic cells. Belts are
@@ -44,7 +60,7 @@ export class AsteroidField {
     for (let v = 0; v < VARIANTS; v++) {
       const b = new GeoBuilder();
       const base = new THREE.Color().setHSL(rng.range(0.05, 0.1), rng.range(0.05, 0.2), rng.range(0.28, 0.4));
-      b.addColored(rockGeometry(rng, 2, rng.range(0.6, 0.9)), (p) => {
+      b.addColored(v === 0 ? (bennuGeometry() ?? rockGeometry(rng, 2, 0.8)) : rockGeometry(rng, 2, rng.range(0.6, 0.9)), (p) => {
         const n = Math.sin(p.x * 7.1 + p.y * 3.3) * Math.sin(p.z * 5.7 - p.y * 2.1);
         return base.clone().multiplyScalar(0.85 + n * 0.2);
       });
